@@ -4,6 +4,7 @@ import "./globals.css";
 import { ToastProvider } from "@/components/ui/toast";
 import { Navbar } from "@/components/ui/mini-navbar";
 import { Providers } from "./providers";
+import { ArtifactProvider } from "@/contexts/artifact-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,7 +33,9 @@ export default function RootLayout({
       >
         <Navbar />
         <Providers>
-          <ToastProvider>{children}</ToastProvider>
+          <ArtifactProvider>
+            <ToastProvider>{children}</ToastProvider>
+          </ArtifactProvider>
         </Providers>
       </body>
     </html>

@@ -12,20 +12,33 @@ import {
 import { Message, MessageContent } from "@/components/ui/message";
 import { Actions, Action } from "@/components/ui/actions";
 import { useToast } from "@/components/ui/toast";
+import { Artifact } from "@/components/ui/artifact";
+import { useArtifact } from "@/contexts/artifact-context";
+import { FunctionExecutionDisplay } from "@/components/chat/function-execution-display";
+import { MultimodalInput } from "@/components/chat/multimodal-input";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   timestamp: Date;
+  tool?: {
+    title: string;
+    kind: "sheet" | "text";
+    content: string;
+    count?: number;
+  };
 }
 
 function ChatContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { openArtifact } = useArtifact();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [importedAddresses, setImportedAddresses] = useState<string[]>([]);
+  const [importMeta, setImportMeta] = useState<{ fileName: string; count: number } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
@@ -90,31 +103,63 @@ function ChatContent() {
   };
 
   const handleSendMessage = async (messageText?: string, skipUser = false) => {
-    const text = messageText || input.trim();
-    if (!text || isLoading) return;
+    let text = messageText ?? input.trim();
+    // Allow sending if there are imported addresses even with empty text
+    if (((!text || text.length === 0) && importedAddresses.length === 0) || isLoading) return;
+    // Do not append addresses to the visible message; keep them hidden in payload.
 
-    if (!skipUser) {
+    // If context-only (no text, only addresses), create ephemeral text for backend validation
+    const isContextOnly = (!text || text.length === 0) && importedAddresses.length > 0;
+    const textToSend = isContextOnly ? "Context-only: addresses uploaded." : text;
+    const shouldShowUserBubble = !isContextOnly && !!text && text.length > 0;
+
+    // Quick rule: if message contains "tabela", open an artifact with a demo sheet
+    if (text.toLowerCase().includes("tabela")) {
+      const demoRows = [
+        { Wallet: "0x1234...abcd", Score: "82", Eligible: "Yes" },
+        { Wallet: "0x9876...ffff", Score: "41", Eligible: "No" },
+        { Wallet: "0xa1b2...c3d4", Score: "73", Eligible: "Yes" },
+      ];
+      const toolNotice: Message = {
+        id: `tool-${Date.now()}`,
+        role: "assistant",
+        content: "",
+        tool: {
+          title: "Tabela de Exemplo",
+          kind: "sheet",
+          content: JSON.stringify(demoRows),
+          count: demoRows.length,
+        },
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, toolNotice]);
+    }
+
+    if (!skipUser && shouldShowUserBubble) {
       const userMessage: Message = {
         id: `user-${Date.now()}`,
         role: "user",
-        content: text,
+        content: textToSend,
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, userMessage]);
       setInput("");
+      // Clear imported addresses after they are used once (remain hidden)
+      if (importedAddresses.length > 0) setImportedAddresses([]);
+      if (importMeta) setImportMeta(null);
     }
 
     setIsLoading(true);
 
     try {
-      const conversationHistory = (skipUser
+      const conversationHistory = ((skipUser || !shouldShowUserBubble)
         ? messages
         : [
             ...messages,
             {
               id: `tmp-${Date.now()}`,
               role: "user" as const,
-              content: text,
+              content: textToSend,
               timestamp: new Date(),
             },
           ]).map((m) => ({
@@ -140,8 +185,10 @@ function ChatContent() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          message: text,
+          message: textToSend,
           conversationHistory,
+          // Hidden context to backend
+          addresses: importedAddresses,
         }),
       });
 
@@ -225,14 +272,133 @@ function ChatContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     handleSendMessage();
+  };
+
+  // -------- File import (xlsx / xls / csv) ----------
+  const parseCsv = (text: string): any[] => {
+    // Simple CSV parser with quotes handling and delimiter auto-detect (',' or ';')
+    const rows: any[] = [];
+    const bomless = text.replace(/^\uFEFF/, '');
+    const lines = bomless.split(/\r?\n/).filter((l) => l.trim().length > 0);
+    if (lines.length === 0) return rows;
+    // Detect delimiter from header line
+    const headerLine = lines[0];
+    const commaCount = (headerLine.match(/,/g) || []).length;
+    const semicolonCount = (headerLine.match(/;/g) || []).length;
+    const delimiter = semicolonCount > commaCount ? ';' : ',';
+    const split = (line: string): string[] => {
+      const result: string[] = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i];
+        if (ch === '"') {
+          if (inQuotes && line[i + 1] === '"') {
+            cur += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (ch === delimiter && !inQuotes) {
+          result.push(cur);
+          cur = '';
+        } else {
+          cur += ch;
+        }
+      }
+      result.push(cur);
+      return result.map((s) => s.trim());
+    };
+    const headers = split(lines[0]).map((h) => h.trim());
+    for (let i = 1; i < lines.length; i++) {
+      const cols = split(lines[i]);
+      const obj: Record<string, any> = {};
+      headers.forEach((h, idx) => {
+        obj[h] = cols[idx];
+      });
+      rows.push(obj);
+    }
+    return rows;
+  };
+
+  const extractAddresses = (rows: any[]): string[] => {
+    if (!rows || rows.length === 0) return [];
+    const isBscAddress = (v: unknown): v is string =>
+      typeof v === 'string' && /^0x[a-fA-F0-9]{40}$/.test(v.trim());
+    const headers = Object.keys(rows[0] || {}).map((h) => String(h));
+    const headerLooksLikeAddress = (h: string) =>
+      /(address|addresses|endereço|endereco|wallet|wallet_address|addr|account|conta|recipient|receiver|to)/i.test(h);
+    const candidateHeader = headers.find((h) => headerLooksLikeAddress(h));
+
+    // 1) Best-effort: scan all cells for 0x... patterns (works even without headers)
+    const found: string[] = [];
+    for (const row of rows) {
+      for (const key of Object.keys(row)) {
+        const value = row[key];
+        if (isBscAddress(value)) found.push(value.trim());
+      }
+    }
+
+    // 2) If none found, try by header heuristic (first matching header or first column)
+    if (found.length === 0) {
+      const headerToUse = candidateHeader || headers[0];
+      for (const row of rows) {
+        const v = row[headerToUse];
+        if (isBscAddress(v)) found.push(String(v).trim());
+      }
+    }
+
+    // Dedupe (case-insensitive)
+    const seen = new Set<string>();
+    const deduped: string[] = [];
+    for (const a of found) {
+      const key = a.toLowerCase();
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(a);
+      }
+    }
+    return deduped;
+  };
+
+  const handleFilePicked = async (file: File) => {
+    try {
+      const ext = file.name.toLowerCase().split('.').pop() || '';
+      let rows: any[] = [];
+      if (ext === 'csv') {
+        const text = await file.text();
+        rows = parseCsv(text);
+      } else if (ext === 'xlsx' || ext === 'xls') {
+        const buf = await file.arrayBuffer();
+        const XLSX = await import('xlsx');
+        const wb = XLSX.read(buf, { type: 'array' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
+      } else {
+        toast("Formato não suportado. Use .xlsx, .xls ou .csv.");
+        return;
+      }
+      const addresses = extractAddresses(rows);
+      if (addresses.length === 0) {
+        toast("Nenhum address encontrado no arquivo.");
+        return;
+      }
+      setImportedAddresses(addresses);
+      setImportMeta({ fileName: file.name, count: addresses.length });
+      toast(`Arquivo importado (${addresses.length} addresses).`);
+    } catch (e) {
+      toast("Falha ao importar arquivo.");
+    }
   };
 
   return (
     <div className="flex flex-col h-screen bg-gradient-to-b from-[#0a0a0a] via-[#0f0f14] to-[#0a0a0a] text-white relative">
       <Navbar />
+      <Artifact />
       
       {/* Messages Area */}
       <div className="flex-1 px-4 py-8 pb-36" style={{ paddingTop: '100px' }}>
@@ -257,7 +423,21 @@ function ChatContent() {
                         <Bot className="w-4 h-4 text-white" />
                       </div>
                     )}
-                    {m.role === "assistant" ? (
+                    {m.role === "assistant" && m.tool ? (
+                      <FunctionExecutionDisplay
+                        metrics={[
+                          {
+                            toolName: "Tool Display",
+                            input: {},
+                            output: {
+                              data: JSON.parse(m.tool.content || "[]"),
+                              log: `${m.tool.count ?? 0} wallets executed`,
+                            },
+                          },
+                        ]}
+                        isNewMessage={false}
+                      />
+                    ) : m.role === "assistant" ? (
                       <div className="flex flex-col items-start">
                         <MessageContent className="bg-[rgba(255,255,255,0.05)] border border-white/10 backdrop-blur-md text-gray-100">
                           <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
@@ -333,41 +513,19 @@ function ChatContent() {
       </div>
 
       {/* Input Area - Estilo da Home (fixo) */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-white/10 bg-[rgba(15,15,20,0.8)] backdrop-blur-sm px-6 py-4">
-        <form onSubmit={handleSubmit} className="max-w-4xl mx-auto">
-          <div className="relative rounded-2xl p-[2px] shadow-[0_1px_2px_0_rgba(0,0,0,0.06)] bg-gradient-to-br from-white/10 via-white/5 to-black/20">
-            <div className="relative rounded-2xl bg-[rgba(15,15,20,0.55)] border border-white/10 backdrop-blur-md">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (input.trim() && !isLoading) {
-                      handleSendMessage();
-                    }
-                  }
-                }}
-                placeholder=""
-                rows={1}
-                className="w-full resize-none rounded-2xl bg-transparent text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-[#F3BA2F]/40 focus:border-[#F3BA2F]/40 px-4 py-3 pr-14 min-h-[52px] max-h-32 overflow-y-auto"
-              />
-              <button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className="absolute right-3 bottom-3 inline-flex items-center justify-center w-10 h-10 rounded-xl bg-[#F3BA2F] text-black hover:bg-[#F0B90B] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                aria-label="Enviar"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
-                  <path d="M7 17L17 7"/>
-                  <path d="M7 7h10v10"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-        </form>
-      </div>
+      <MultimodalInput
+        value={input}
+        onChange={setInput}
+        isStreaming={isLoading}
+        onSubmit={() => handleSubmit()}
+        onStop={() => setIsLoading(false)}
+        onPickFile={handleFilePicked}
+        importMeta={importMeta}
+        clearImport={() => {
+          setImportedAddresses([]);
+          setImportMeta(null);
+        }}
+      />
     </div>
   );
 }
