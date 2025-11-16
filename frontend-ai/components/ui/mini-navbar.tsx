@@ -66,9 +66,9 @@ export function Navbar() {
   );
 
   const navLinksData = [
-    { label: 'About', href: '#1' },
-    { label: 'Solutions', href: '#2' },
-    { label: 'Plans', href: '#3' },
+    { label: 'Team', href: '/team' },
+    { label: 'Solutions', href: '/solutions' },
+    { label: 'Pricing', href: '/pricing' },
   ];
 
   const loginButtonElement = (

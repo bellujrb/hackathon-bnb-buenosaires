@@ -36,7 +36,7 @@ export type HeroWaveProps = {
 
 };
 
-export function HeroWave({ className, style, extendLeftPx = 320, title = "AI Wallet Analyzer for BNB Chain.", subtitle = "Analyze wallet addresses to verify trustworthiness for airdrops. Check creation date, protocol interactions, and send bulk airdrops via spreadsheet.", placeholder = "Enter wallet addresses or upload spreadsheet...", buttonText = "Analyze", onPromptSubmit }: HeroWaveProps) {
+export function HeroWave({ className, style, extendLeftPx = 320, title = "AI‑powered KYW & Airdrops for BNB Chain", subtitle = "Validate wallets, batch‑check lists and distribute tokens safely with our agent.", placeholder = "Paste wallet addresses or import a spreadsheet…", buttonText = "Validate", onPromptSubmit }: HeroWaveProps) {
 
   const [prompt, setPrompt] = useState("");
 
@@ -526,9 +526,9 @@ export function HeroWave({ className, style, extendLeftPx = 320, title = "AI Wal
 
     function createInstancedMaterial() {
 
-      const baseCol = new THREE.Color("hsl(45,88%,60%)");
+      const baseCol = new THREE.Color("hsl(265,88%,60%)");
 
-      const emisCol = new THREE.Color("#F3BA2F");
+      const emisCol = new THREE.Color("#9333EA");
 
       return new THREE.ShaderMaterial({
 
@@ -1448,7 +1448,7 @@ export function HeroWave({ className, style, extendLeftPx = 320, title = "AI Wal
 
         >
 
-          <h1 className="text-white text-3xl sm:text-5xl font-semibold tracking-tight drop-shadow-[0_1px_8px_rgba(243,186,47,0.25)]">
+          <h1 className="text-white text-3xl sm:text-5xl font-semibold tracking-tight drop-shadow-[0_1px_8px_rgba(147,51,234,0.35)]">
 
             {title}
 
@@ -1488,7 +1488,7 @@ export function HeroWave({ className, style, extendLeftPx = 320, title = "AI Wal
 
                   rows={5}
 
-                  className="w-full h-32 sm:h-36 resize-none rounded-2xl bg-[rgba(15,15,20,0.55)] border border-white/10 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-[#F3BA2F]/40 focus:border-[#F3BA2F]/40 backdrop-blur-md px-4 py-4 pr-16"
+                  className="w-full h-32 sm:h-36 resize-none rounded-2xl bg-[rgba(15,15,20,0.55)] border border-white/10 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-[#9333EA]/40 focus:border-[#9333EA]/40 backdrop-blur-md px-4 py-4 pr-16"
 
                 />
 
