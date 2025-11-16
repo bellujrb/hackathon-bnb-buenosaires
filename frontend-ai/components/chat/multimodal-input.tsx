@@ -98,7 +98,7 @@ export function MultimodalInput({
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10 bg-white/10 rounded-2xl">
               <div className="flex flex-col items-center gap-2 bg-black/40 p-3 rounded-lg border border-white/20">
                 <span className="text-sm font-medium text-white/90">
-                  Solte o arquivo para anexar
+                  Drop the file to attach
                 </span>
               </div>
             </div>
@@ -126,7 +126,7 @@ export function MultimodalInput({
                 onChange={(e) => onChange(e.target.value)}
                 onKeyDown={handleKeyDown}
                 spellCheck={false}
-                placeholder={isDragging ? 'Solte o arquivo aqui...' : ''}
+                placeholder={isDragging ? 'Drop the file here...' : ''}
                 rows={1}
                 className={`w-full resize-none bg-transparent text-white placeholder:text-white/50 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 min-h-[20px] max-h-[400px] leading-relaxed p-0 pr-10`}
               />
@@ -148,7 +148,7 @@ export function MultimodalInput({
                 </span>
                 <button
                   type="button"
-                  aria-label="Remover addresses importados"
+                  aria-label="Remove imported addresses"
                   className="text-white/80 hover:text-white"
                   onClick={clearImport}
                 >
@@ -166,8 +166,8 @@ export function MultimodalInput({
                 type="button"
                 onClick={() => fileRef.current?.click()}
                 className="inline-flex items-center justify-center h-8 w-8 rounded-md bg-white/10 text-white border border-white/20 hover:bg-white/15 transition-colors"
-                aria-label="Importar arquivo"
-                title="Importar arquivo (.xlsx, .xls, .csv)"
+                aria-label="Import file"
+                title="Import file (.xlsx, .xls, .csv)"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <path d="M21 15v4a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-4" />
@@ -184,7 +184,7 @@ export function MultimodalInput({
                   type="button"
                   onClick={onStop}
                   className="h-8 w-8 p-0 inline-flex items-center justify-center rounded-md border border-white/30 bg-transparent hover:bg-white/10 text-white transition-colors"
-                  aria-label="Parar"
+                  aria-label="Stop"
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                     <rect x="6" y="6" width="12" height="12" />
@@ -196,7 +196,7 @@ export function MultimodalInput({
                   onClick={onSubmit}
                   disabled={!value.trim() && !importMeta}
                   className="h-8 w-8 p-0 inline-flex items-center justify-center rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                  aria-label="Enviar"
+                  aria-label="Send"
                   title={value.trim() || importMeta ? 'Send message' : 'Enter a message'}
                 >
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">

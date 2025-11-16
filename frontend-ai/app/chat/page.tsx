@@ -16,6 +16,7 @@ import { Artifact } from "@/components/ui/artifact";
 import { useArtifact } from "@/contexts/artifact-context";
 import { FunctionExecutionDisplay } from "@/components/chat/function-execution-display";
 import { MultimodalInput } from "@/components/chat/multimodal-input";
+import { TextShimmer } from "@/components/ui/text-shimmer";
 
 interface Message {
   id: string;
@@ -64,8 +65,8 @@ function ChatContent() {
       }
       return next;
     });
-    if (wasLiked) toast("Like removido");
-    else toast("Você curtiu a resposta");
+    if (wasLiked) toast("Like removed");
+    else toast("You liked the answer");
   };
 
   const handleDislikeMessage = (id: string) => {
@@ -84,18 +85,18 @@ function ChatContent() {
       }
       return next;
     });
-    if (wasDisliked) toast("Dislike removido");
-    else toast("Você não curtiu a resposta");
+    if (wasDisliked) toast("Dislike removed");
+    else toast("You disliked the answer");
   };
 
   const handleShareMessage = async (content: string) => {
     try {
       if (navigator.share) {
         await navigator.share({ text: content });
-        toast("Compartilhado!");
+        toast("Shared!");
       } else {
         await navigator.clipboard.writeText(content);
-        toast("Copiado para compartilhar!");
+        toast("Copied to share!");
       }
     } catch {
       // ignore
@@ -183,7 +184,11 @@ function ChatContent() {
       // Usa endpoint de streaming (SSE-like via fetch)
       const res = await fetch(`${API_BASE}/api/langgraph/message/stream`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "Accept": "text/event-stream",
+        },
+        cache: "no-store",
         body: JSON.stringify({
           message: textToSend,
           conversationHistory,
@@ -193,13 +198,13 @@ function ChatContent() {
       });
 
       if (!res.ok) {
-        throw new Error(`Erro na API (${res.status})`);
+        throw new Error(`API error (${res.status})`);
       }
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
 
-      if (!reader) throw new Error("Não foi possível iniciar o streaming de resposta.");
+      if (!reader) throw new Error("Could not start response streaming.");
 
       let done = false;
       let buffer = "";
@@ -208,30 +213,42 @@ function ChatContent() {
         done = doneReading;
         if (value) {
           buffer += decoder.decode(value, { stream: true });
-          const parts = buffer.split("\n\n");
+          // Divide eventos por linhas em branco (suporta \n\n e \r\n\r\n)
+          const parts = buffer.split(/\r?\n\r?\n/);
           buffer = parts.pop() || "";
 
           for (const part of parts) {
-            // Formato SSE: "event: xxx" ou "data: {...}"
-            if (part.startsWith("event: done")) {
-              setIsLoading(false);
-              break;
-            }
-            if (part.startsWith("data: ")) {
-              try {
-                const payload = JSON.parse(part.replace("data: ", ""));
-                if (typeof payload?.text === "string") {
-                  setMessages((prev) =>
-                    prev.map((m) =>
-                      m.id === assistantId
-                        ? { ...m, content: m.content + payload.text }
-                        : m
-                    )
-                  );
+            const lines = part.split(/\r?\n/);
+            let isDoneEvent = false;
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed) continue;
+              if (trimmed.startsWith("event:")) {
+                if (/event:\s*done/i.test(trimmed)) {
+                  isDoneEvent = true;
                 }
-              } catch {
-                // ignora linhas não-JSON
+                continue;
               }
+              if (trimmed.startsWith("data:")) {
+                const dataStr = trimmed.replace(/^data:\s*/, "");
+                try {
+                  const payload = JSON.parse(dataStr);
+                  if (typeof payload?.text === "string") {
+                    setMessages((prev) =>
+                      prev.map((m) =>
+                        m.id === assistantId
+                          ? { ...m, content: m.content + payload.text }
+                          : m
+                      )
+                    );
+                  }
+                } catch {
+                  // ignore malformed lines
+                }
+              }
+            }
+            if (isDoneEvent) {
+              setIsLoading(false);
             }
           }
         }
@@ -240,7 +257,7 @@ function ChatContent() {
       const assistantMessage: Message = {
         id: `assistant-${Date.now()}`,
         role: "assistant",
-        content: `Falha ao processar sua mensagem. ${err?.message || ""}`.trim(),
+        content: `Failed to process your message. ${err?.message || ""}`.trim(),
         timestamp: new Date(),
       };
       setMessages((prev) => [...prev, assistantMessage]);
@@ -379,19 +396,19 @@ function ChatContent() {
         const ws = wb.Sheets[wsName];
         rows = XLSX.utils.sheet_to_json(ws, { defval: '' }) as any[];
       } else {
-        toast("Formato não suportado. Use .xlsx, .xls ou .csv.");
+        toast("Unsupported format. Use .xlsx, .xls or .csv.");
         return;
       }
       const addresses = extractAddresses(rows);
       if (addresses.length === 0) {
-        toast("Nenhum address encontrado no arquivo.");
+        toast("No addresses found in the file.");
         return;
       }
       setImportedAddresses(addresses);
       setImportMeta({ fileName: file.name, count: addresses.length });
-      toast(`Arquivo importado (${addresses.length} addresses).`);
+      toast(`File imported (${addresses.length} addresses).`);
     } catch (e) {
-      toast("Falha ao importar arquivo.");
+      toast("Failed to import file.");
     }
   };
 
@@ -405,7 +422,7 @@ function ChatContent() {
         <div className="max-w-4xl mx-auto w-full h-full relative">
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
-              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#F3BA2F] to-[#F0B90B] flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#9333EA] to-[#7E22CE] flex items-center justify-center">
                 <Bot className="w-6 h-6 text-white" />
               </div>
             </div>
@@ -419,7 +436,7 @@ function ChatContent() {
                     className="flex items-center gap-3"
                   >
                     {m.role === "assistant" && (
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#F3BA2F] to-[#F0B90B] flex items-center justify-center flex-shrink-0">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9333EA] to-[#7E22CE] flex items-center justify-center flex-shrink-0">
                         <Bot className="w-4 h-4 text-white" />
                       </div>
                     )}
@@ -440,44 +457,52 @@ function ChatContent() {
                     ) : m.role === "assistant" ? (
                       <div className="flex flex-col items-start">
                         <MessageContent className="bg-[rgba(255,255,255,0.05)] border border-white/10 backdrop-blur-md text-gray-100">
-                          <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
-                            {m.content}
-                          </p>
+                          {m.content && m.content.length > 0 ? (
+                            <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
+                              {m.content}
+                            </p>
+                          ) : (
+                            <div className="py-0.5">
+                              <TextShimmer className="font-mono text-sm">
+                                Exploring information...
+                              </TextShimmer>
+                            </div>
+                          )}
                         </MessageContent>
                         <Actions className="mt-2">
                           <Action
-                            tooltip="Tentar novamente"
+                            tooltip="Try again"
                             label="Retry"
                             onClick={() => {
-                              // encontra a última mensagem do usuário antes deste assistant
+                              // find the last user message before this assistant
                               const prevUser = [...messages]
                                 .slice(0, idx)
                                 .reverse()
                                 .find((mm) => mm.role === "user")?.content;
                               if (prevUser) {
-                                // reenvia incluindo a bolha do usuário novamente
+                                // resend including the user bubble again
                                 handleSendMessage(prevUser, false);
                               }
                             }}
                           >
                             <RefreshCcwIcon className="size-4" />
                           </Action>
-                          <Action tooltip="Gostei" label="Like" onClick={() => handleLikeMessage(m.id)}>
+                          <Action tooltip="Like" label="Like" onClick={() => handleLikeMessage(m.id)}>
                             <ThumbsUpIcon className={`size-4 ${likedIds.has(m.id) ? "text-white" : ""}`} />
                           </Action>
-                          <Action tooltip="Não gostei" label="Dislike" onClick={() => handleDislikeMessage(m.id)}>
+                          <Action tooltip="Dislike" label="Dislike" onClick={() => handleDislikeMessage(m.id)}>
                             <ThumbsDownIcon className={`size-4 ${dislikedIds.has(m.id) ? "text-white" : ""}`} />
                           </Action>
-                          <Action tooltip="Copiar" label="Copiar" onClick={async () => { await navigator.clipboard.writeText(m.content); toast("Copiado!"); }}>
+                          <Action tooltip="Copy" label="Copy" onClick={async () => { await navigator.clipboard.writeText(m.content); toast("Copied!"); }}>
                             <CopyIcon className="size-4" />
                           </Action>
-                          <Action tooltip="Compartilhar" label="Share" onClick={() => handleShareMessage(m.content)}>
+                          <Action tooltip="Share" label="Share" onClick={() => handleShareMessage(m.content)}>
                             <ShareIcon className="size-4" />
                           </Action>
                         </Actions>
                       </div>
                     ) : (
-                      <MessageContent className="bg-gradient-to-br from-[#F3BA2F] to-[#F0B90B] text-black">
+                      <MessageContent className="bg-gradient-to-br from-[#9333EA] to-[#7E22CE] text-white">
                         <p className="text-[15px] leading-relaxed whitespace-pre-wrap">
                           {m.content}
                         </p>
@@ -492,14 +517,26 @@ function ChatContent() {
                 ))}
                 {isLoading && !isStreaming && (
                   <Message from="assistant" className="flex items-center gap-3 justify-start">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#F3BA2F] to-[#F0B90B] flex items-center justify-center flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#9333EA] to-[#7E22CE] flex items-center justify-center flex-shrink-0">
                       <Bot className="w-4 h-4 text-white" />
                     </div>
                     <MessageContent className="bg-[rgba(255,255,255,0.05)] border border-white/10 backdrop-blur-md">
-                      <div className="flex gap-1.5">
-                        <div className="w-1.5 h-1.5 bg-[#F3BA2F] rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
-                        <div className="w-1.5 h-1.5 bg-[#F3BA2F] rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
-                        <div className="w-1.5 h-1.5 bg-[#F3BA2F] rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                      <div className="space-y-3">
+                        <TextShimmer className="font-mono text-sm" duration={1}>
+                          Generating code...
+                        </TextShimmer>
+                        <div className="text-xs text-white/70 whitespace-pre-wrap leading-relaxed">
+                          You are given a task to integrate an existing React component in the codebase
+
+                          The codebase should support:
+                          - shadcn project structure
+                          - Tailwind CSS
+                          - Typescript
+                          If it doesn't, provide instructions on how to setup project via shadcn CLI, install Tailwind or Typescript.
+                          Determine the default path for components and styles.
+                          If default path for components is not /components/ui, provide instructions on why it's important to create this folder.
+                          Copy-paste this component to /components/ui folder and install framer-motion.
+                        </div>
                       </div>
                     </MessageContent>
                   </Message>
@@ -534,7 +571,7 @@ export default function ChatPage() {
   return (
     <Suspense fallback={
       <div className="flex items-center justify-center h-screen bg-gradient-to-b from-[#0a0a0a] via-[#0f0f14] to-[#0a0a0a]">
-        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#F3BA2F] to-[#F0B90B] flex items-center justify-center animate-pulse">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#9333EA] to-[#7E22CE] flex items-center justify-center animate-pulse">
           <Bot className="w-6 h-6 text-white" />
         </div>
       </div>
