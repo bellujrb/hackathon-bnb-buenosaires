@@ -1,6 +1,13 @@
 # LangGraph Backend
 
-Backend NestJS com módulo LangGraph simplificado para envio de mensagens para OpenAI e retorno de respostas.
+Backend em NestJS que expõe uma API simples para conversas de IA usando LangGraph + OpenAI.
+
+## Resumo rápido
+- Instalação: `npm install`
+- Variáveis: definir `OPENAI_API_KEY` no `.env`
+- Dev: `npm run start:dev` → `http://localhost:3000`
+- Endpoint principal: `POST /api/langgraph/message/stream`
+- Healthcheck: `GET /api/langgraph/health`
 
 ## Estrutura
 

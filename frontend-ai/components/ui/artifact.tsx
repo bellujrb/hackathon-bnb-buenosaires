@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { useArtifact } from '@/contexts/artifact-context';
+import { useLogin, useWallets } from '@privy-io/react-auth';
+import { sendTestnetTxn, type PrivyEvmWallet, signTextWithPrivy } from '@/lib/privy-viem';
 
 function parseTable(content: string): Array<Record<string, any>> {
   try {
@@ -28,6 +30,13 @@ export function Artifact() {
   const [filter, setFilter] = useState<string>('');
   const [pageIndex, setPageIndex] = useState<number>(0);
   const [pageSize, setPageSize] = useState<number>(10);
+  const [showAirdropForm, setShowAirdropForm] = useState<boolean>(false);
+  const [amount, setAmount] = useState<string>('');
+  const [tokenAddress, setTokenAddress] = useState<string>('');
+  const [isAirdropping, setIsAirdropping] = useState<boolean>(false);
+  const [airdropMsg, setAirdropMsg] = useState<string>('');
+  const { wallets } = useWallets();
+  const { login } = useLogin();
 
   const allRows = useMemo(() => {
     if (!artifact.isVisible) return [];
@@ -52,6 +61,62 @@ export function Artifact() {
     const start = pageIndex * pageSize;
     return filteredRows.slice(start, start + pageSize);
   }, [filteredRows, pageIndex, pageSize]);
+
+  const firstWalletFromData = useMemo(() => {
+    // Try to find a plausible wallet address in the data
+    const findIn = (rows: Array<Record<string, any>>) => {
+      for (const r of rows) {
+        for (const [k, v] of Object.entries(r)) {
+          if (typeof v === 'string' && /^0x[a-fA-F0-9]{40}$/.test(v)) return v as string;
+          if (/wallet/i.test(k) && typeof v === 'string') return v as string;
+        }
+      }
+      return null;
+    };
+    return findIn(filteredRows) || findIn(allRows);
+  }, [filteredRows, allRows]);
+
+  const handleStartAirdrop = async () => {
+    try {
+      setAirdropMsg('');
+      if (!amount || Number.isNaN(Number(amount)) || Number(amount) <= 0) {
+        setAirdropMsg('Informe um amount válido.');
+        return;
+      }
+      if (!firstWalletFromData) {
+        setAirdropMsg('Nenhum endereço de destino encontrado na tabela.');
+        return;
+      }
+      const isValidTokenAddress = /^0x[a-fA-F0-9]{40}$/.test(tokenAddress.trim());
+      // Ensure user is logged in / has wallet
+      let privyWallet = wallets[0] as PrivyEvmWallet | undefined;
+      if (!privyWallet) {
+        await login();
+        // give Privy a moment to hydrate
+        await new Promise(r => setTimeout(r, 300));
+        privyWallet = (wallets[0] as PrivyEvmWallet | undefined) || undefined;
+      }
+      if (!privyWallet) {
+        setAirdropMsg('Wallet Privy não encontrada. Tente novamente após login.');
+        return;
+      }
+      setIsAirdropping(true);
+      // If no valid token address provided, treat as native (BNB) testnet transfer
+      if (!isValidTokenAddress) {
+        const hash = await sendTestnetTxn(privyWallet, firstWalletFromData as `0x${string}`, String(amount));
+        setAirdropMsg(`Transação enviada (testnet): ${String(hash)}`);
+      } else {
+        // For ERC-20-like tokens in this demo, only sign an intent message
+        const payload = `Airdrop intent: send ${amount} of token ${tokenAddress} to first recipient ${firstWalletFromData} (total ${filteredRows.length} rows filtered)`;
+        const sig = await signTextWithPrivy(privyWallet, payload);
+        setAirdropMsg(`Assinatura registrada para airdrop de ${amount} token(${tokenAddress.slice(0,6)}...${tokenAddress.slice(-4)}): ${sig.slice(0, 18)}...`);
+      }
+    } catch (e: any) {
+      setAirdropMsg(`Falha ao iniciar airdrop: ${e?.message || 'erro'}`);
+    } finally {
+      setIsAirdropping(false);
+    }
+  };
 
   if (!artifact.isVisible) return null;
 
@@ -89,6 +154,56 @@ export function Artifact() {
                     {[10,20,30,40,50].map(n => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Airdrop action */}
+              <div className="px-4 py-3 bg-white/[0.02] border-b border-white/10 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <button
+                    onClick={() => setShowAirdropForm(v => !v)}
+                    className="text-[13px] rounded-md px-4 py-2 text-white bg-gradient-to-r from-[#7E22CE] via-[#9333EA] to-[#7E22CE] shadow-[0_8px_30px_rgba(126,34,206,0.35)] hover:brightness-110 transition-all"
+                  >
+                    {showAirdropForm ? 'Close Airdrop' : '🚀 Start Airdrop'}
+                  </button>
+                  {firstWalletFromData && (
+                    <div className="text-xs text-gray-400">
+                      Primeiro destinatário: {firstWalletFromData.slice(0, 6)}...{firstWalletFromData.slice(-4)}
+                    </div>
+                  )}
+                </div>
+                {showAirdropForm && (
+                  <div className="grid grid-cols-3 gap-2">
+                    <input
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Amount"
+                      className="col-span-1 rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20"
+                    />
+                    <div className="col-span-1 flex flex-col gap-1">
+                      <input
+                        value={tokenAddress}
+                        onChange={(e) => setTokenAddress(e.target.value)}
+                        placeholder="Token address (0x...)"
+                        className="rounded-md bg-black/30 border border-white/10 px-3 py-2 text-sm text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-white/20"
+                      />
+                      {/^0x[a-fA-F0-9]{40}$/.test(tokenAddress.trim()) && (
+                        <div className="text-[11px] text-gray-300">
+                          Token: wBTC
+                        </div>
+                      )}
+                    </div>
+                    <button
+                      disabled={isAirdropping}
+                      onClick={handleStartAirdrop}
+                      className="col-span-1 rounded-md bg-gradient-to-br from-[#9333EA] to-[#7E22CE] border border-white/10 px-3 py-2 text-sm text-white hover:opacity-95 transition-opacity disabled:opacity-50"
+                    >
+                      {isAirdropping ? 'Assinando...' : 'Assinar/Enviar'}
+                    </button>
+                    {airdropMsg && (
+                      <div className="col-span-3 text-xs text-gray-300">{airdropMsg}</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="w-full overflow-auto">
