@@ -1479,17 +1479,17 @@ export function HeroWave({ className, style, extendLeftPx = 320, title = "AI‑p
               <div className="relative rounded-2xl p-[2px] shadow-[0_1px_2px_0_rgba(0,0,0,0.06)] bg-gradient-to-br from-white/10 via-white/5 to-black/20">
 
                 <textarea
-
                   value={prompt}
-
                   onChange={(e) => setPrompt(e.target.value)}
-
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      onPromptSubmit?.(prompt);
+                    }
+                  }}
                   placeholder={animatedPlaceholder}
-
                   rows={5}
-
                   className="w-full h-32 sm:h-36 resize-none rounded-2xl bg-[rgba(15,15,20,0.55)] border border-white/10 text-white placeholder:text-white/40 outline-none focus:ring-2 focus:ring-[#9333EA]/40 focus:border-[#9333EA]/40 backdrop-blur-md px-4 py-4 pr-16"
-
                 />
 
               </div>
