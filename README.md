@@ -1,85 +1,85 @@
 ## Hackathon BNB Buenos Aires — Monorepo
 
-Aplicação full‑stack para análise conversacional de wallets na BNB Chain. O frontend (Next.js) oferece uma interface de chat com upload de listas (CSV/XLS/XLSX) e visualização de artefatos; o backend (NestJS + LangGraph/LangChain) orquestra um pipeline multi‑etapas com streaming (SSE) e integração com modelos OpenAI.
+Full‑stack application for conversational analysis of BNB Chain wallets. The frontend (Next.js) provides a chat interface with spreadsheet upload (CSV/XLS/XLSX) and artifact visualization; the backend (NestJS + LangGraph/LangChain) orchestrates a multi‑step pipeline with real‑time streaming (SSE) and OpenAI integration.
 
-### Estrutura do repositório
+### Repository structure
 ```
 .
-├── frontend-ai/        # App Next.js (chat, UI, upload, artefatos)
-├── backend/            # API NestJS (LangGraph, SSE, validação, prompts)
-└── blockchain/         # Contratos Solidity + Foundry (TokenDistributor, scripts)
+├── frontend-ai/        # Next.js app (chat, UI, uploads, artifacts)
+├── backend/            # NestJS API (LangGraph, SSE, validation, prompts)
+└── blockchain/         # Solidity + Foundry (TokenDistributor, scripts)
 ```
 
-### Principais recursos
-- Chat com IA e streaming em tempo real (SSE).
-- Upload de planilhas (.csv, .xls, .xlsx) com extração automática de endereços BNB.
-- Pipeline LangGraph com nós: validação, elicitação de filtros, extração estruturada, execução de busca e formatação de relatório.
-- Renderização de artefatos (por ex. “tabela de exemplo”) no frontend.
-- Integrações Web3 (Privy/viem) e UI moderna (Tailwind, componentes custom).
-- Módulo blockchain com contrato `TokenDistributor` para airdrops (igual e em lote) e toolchain Foundry (build, test, deploy).
+### Key features
+- AI chat with real‑time streaming (SSE).
+- Spreadsheet upload (.csv, .xls, .xlsx) with automatic BNB address extraction and deduplication.
+- LangGraph pipeline nodes: address validation, filter elicitation, structured extraction, backend tool call, and report formatting.
+- Artifact rendering in the frontend (e.g., “example table”).
+- Web3 integrations (Privy/viem) and modern UI (Tailwind, custom components).
+- Blockchain module with `TokenDistributor` for equal and batch airdrops using Foundry toolchain.
 
 ---
 
-## Como rodar localmente
+## Run locally
 
-Pré‑requisitos:
-- Node.js 18+ e npm
-- Chave da OpenAI (`OPENAI_API_KEY`) para o backend
+Prerequisites:
+- Node.js 18+ and npm
+- OpenAI key (`OPENAI_API_KEY`) for the backend
 
 1) Backend
 ```bash
 cd backend
 npm install
-cp .env.example .env   # se existir; caso contrário, crie .env
-# Edite .env e defina:
+cp .env.example .env   # if available; otherwise, create .env
+# Set your OpenAI key:
 # OPENAI_API_KEY=sk-...
 npm run start:dev
-# Servirá em http://localhost:3000
+# Serves at http://localhost:3000
 ```
 
 2) Frontend
 ```bash
 cd frontend-ai
 npm install
-cp .env.local.example .env.local  # se existir; caso contrário, crie .env.local
-# Edite .env.local e defina:
+cp .env.local.example .env.local  # if available; otherwise, create .env.local
+# Set the backend URL:
 # NEXT_PUBLIC_API_URL=http://localhost:3000
 npm run dev
-# Acesse http://localhost:3000
+# Open http://localhost:3000
 ```
 
-Observação: se a porta do frontend conflitar com o backend, ajuste a porta do Next (ex.: 3001) e mantenha `NEXT_PUBLIC_API_URL` apontando para o backend.
+Note: if the frontend port conflicts with the backend, run Next on a different port (e.g., 3001) and keep `NEXT_PUBLIC_API_URL` pointing to the backend.
 
 ---
 
-## Fluxo de uso (end‑to‑end)
-1. Abra `http://localhost:3000` (frontend) e vá para a página de chat (`/chat`).
-2. Opcional: importe uma planilha com endereços BNB (a UI faz a extração e deduplicação).
-3. Envie uma mensagem. O frontend inicia streaming para `POST /api/langgraph/message/stream` no backend.
-4. O backend executa o pipeline:
-   - Valida/infere endereços (regex 0x...40 hex).
-   - Elicita filtros (protocolo, período, stablecoins, idade da conta etc.).
-   - Extrai filtros como saída estruturada (LangChain structured output).
-   - Chama função de busca (tool) e agrega dados.
-   - Formata relatório final via LLM e envia por SSE.
-5. O frontend renderiza a resposta e, quando pertinente, artefatos (ex.: tabela).
+## End‑to‑end usage
+1. Open `http://localhost:3000` (frontend) and go to `/chat`.
+2. Optional: import a spreadsheet with BNB addresses (the UI extracts & deduplicates).
+3. Send a message. The frontend streams to `POST /api/langgraph/message/stream`.
+4. The backend runs the pipeline:
+   - Validates/infers addresses (0x + 40 hex).
+   - Elicits filters (protocol, time window, stablecoins, account age, etc.).
+   - Extracts filters as structured output (LangChain).
+   - Calls a search tool with the filters and addresses.
+   - Formats the final report with the LLM and streams it back via SSE.
+5. The frontend renders the response and, when relevant, artifacts (e.g., tables).
 
 ---
 
-## Detalhes técnicos
+## Technical details
 
 ### Frontend (`frontend-ai/`)
 - Next.js (App Router), React 19, Tailwind v4.
-- Componentes em `components/ui` e `components/chat`.
-- Página principal de chat em `app/chat/page.tsx`:
-  - Streaming SSE via `fetch` para `${NEXT_PUBLIC_API_URL}/api/langgraph/message/stream`.
-  - Upload/parse de CSV/XLS/XLSX com extração de endereços e deduplicação.
-  - UI de mensagens, ações (retry/like/dislike/share/copy) e artefatos.
+- Components in `components/ui` and `components/chat`.
+- Main chat page at `app/chat/page.tsx`:
+  - SSE streaming via `fetch` to `${NEXT_PUBLIC_API_URL}/api/langgraph/message/stream`.
+  - CSV/XLS/XLSX upload/parse with address extraction & deduplication.
+  - Message UI, actions (retry/like/dislike/share/copy), and artifacts.
 
-Variáveis:
-- `NEXT_PUBLIC_API_URL` — base da API do backend.
+Environment:
+- `NEXT_PUBLIC_API_URL` — backend API base URL.
 
-Scripts úteis:
+Useful scripts:
 ```bash
 npm run dev
 npm run build
@@ -88,33 +88,33 @@ npm start
 
 ### Backend (`backend/`)
 - NestJS, LangChain/LangGraph, SSE, Swagger.
-- Módulo principal: `modules/langgraph/` com:
-  - `nodes/pipeline.nodes.ts` (válida endereços, pergunta/extrai filtros, chama tool de busca, formata relatório).
-  - `langgraph.controller.ts` (rotas `message`, `message/stream`, `analyze-wallets`, health).
-  - `services/*` (OpenAIModelService, estado da conversa).
+- Main module: `modules/langgraph/` with:
+  - `nodes/pipeline.nodes.ts` (validate addresses, ask/extract filters, call search tool, format report).
+  - `langgraph.controller.ts` (routes: `message`, `message/stream`, `analyze-wallets`, `health`).
+  - `services/*` (OpenAIModelService, conversation state).
 
-Variáveis:
-- `OPENAI_API_KEY` — chave OpenAI.
+Environment:
+- `OPENAI_API_KEY` — OpenAI key.
 
-Scripts úteis:
+Useful scripts:
 ```bash
 npm run start:dev
 npm run build
 npm run start:prod
 ```
 
-Endpoints (prefixo `/api/langgraph`):
-- `POST /message/stream` — streaming SSE da conversa (principal).
-- `POST /message` — resposta não‑streaming.
-- `POST /analyze-wallets` e `/analyze-wallets/stream` — execução com lista explícita.
-- `GET /health` — status do agente.
+Endpoints (prefix `/api/langgraph`):
+- `POST /message/stream` — main SSE streaming endpoint.
+- `POST /message` — non‑streaming response.
+- `POST /analyze-wallets` and `/analyze-wallets/stream` — explicit list execution.
+- `GET /health` — agent status.
 
 ### Blockchain (`blockchain/`)
-- Contrato principal: `TokenDistributor.sol` (airdrop igualitário e em lote) com SafeERC20 e otimizações de gas.
-- Tooling: Foundry (`forge`, `anvil`) para build, teste, gas-report e deploy.
-- Documentos úteis: `AIRDROP_SCRIPTS.md`, `AIRDROP_TOKEN_GUIDE.md`, `QUICK_START_AIRDROP.md`, `USAGE.md`, `PROJECT_SUMMARY.md`, `CHECKLIST.md`.
+- Main contract: `TokenDistributor.sol` (equal and batch airdrops) with SafeERC20 and gas optimizations.
+- Tooling: Foundry (`forge`, `anvil`) for build, test, gas report and deploy.
+- Useful docs: `AIRDROP_SCRIPTS.md`, `AIRDROP_TOKEN_GUIDE.md`, `QUICK_START_AIRDROP.md`, `USAGE.md`, `PROJECT_SUMMARY.md`, `CHECKLIST.md`.
 
-Comandos básicos:
+Basic commands:
 ```bash
 cd blockchain
 forge install
@@ -127,19 +127,95 @@ forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
 
 ---
 
-## Deploy (resumo)
-- Backend: containerize (Node 18+), expor porta 3000, definir `OPENAI_API_KEY`. Habilitar CORS para o domínio do frontend e usar proxy reverso (NGINX/Cloudflare) para SSE.
-- Frontend: build Next.js e hospedar (Vercel/Netlify) com `NEXT_PUBLIC_API_URL` apontando para a API pública do backend.
- - Blockchain: usar Foundry para deploy (testnet/mainnet). Ver `blockchain/README.md` e `blockchain/AIRDROP_SCRIPTS.md`.
+## Deployment
+
+### Backend (NestJS)
+Options:
+- Node on VM/container, or Docker.
+- Ensure CORS is enabled for the frontend domain and a reverse proxy supports SSE (e.g., NGINX/Cloudflare).
+
+Environment:
+- `OPENAI_API_KEY`
+
+Node example:
+```bash
+cd backend
+npm ci
+NODE_ENV=production OPENAI_API_KEY=sk-... npm run build
+OPENAI_API_KEY=sk-... npm run start:prod
+```
+
+Docker example (minimal):
+```Dockerfile
+FROM node:18-alpine AS build
+WORKDIR /app
+COPY backend/package*.json ./
+RUN npm ci
+COPY backend ./
+RUN npm run build
+
+FROM node:18-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app ./
+RUN npm ci --omit=dev
+EXPOSE 3000
+CMD ["npm","run","start:prod"]
+```
+
+### Frontend (Next.js)
+Options:
+- Vercel/Netlify or any Node hosting.
+
+Environment:
+- `NEXT_PUBLIC_API_URL` pointing to the public backend (e.g., `https://api.example.com`)
+
+Vercel example:
+- Set `NEXT_PUBLIC_API_URL` in Project Settings → Environment Variables.
+- Deploy via Git integration or `vercel --prod`.
+
+Self-hosted Node:
+```bash
+cd frontend-ai
+npm ci
+npm run build
+NEXT_PUBLIC_API_URL=https://api.example.com npm start
+```
+
+### Blockchain (Foundry)
+Testnet deployment:
+```bash
+cd blockchain
+export PRIVATE_KEY=0x...            # use a secure method in production
+forge script script/Deploy.s.sol \
+  --rpc-url https://data-seed-prebsc-1-s1.binance.org:8545 \
+  --broadcast
+``]
+
+Mainnet deployment:
+```bash
+cd blockchain
+export PRIVATE_KEY=0x...
+forge script script/Deploy.s.sol \
+  --rpc-url https://bsc-dataseed1.bnbchain.org:443 \
+  --broadcast
+```
+
+Verification (if supported):
+```bash
+forge verify-contract <contract-address> <contract-name> \
+  --chain bsc \
+  --etherscan-api-key <BSCSCAN_API_KEY>
+```
 
 ---
 
-## Licença
-Defina a licença do projeto (ex.: MIT) conforme a necessidade do hackathon/organização.
+## License
+Choose the license that fits your needs (e.g., MIT).
 
 ---
 
 ## Whitepaper
-Conteúdo completo do whitepaper está em `WHITEPAPER.md`.
+See `WHITEPAPER.md` for a full technical overview.
 
 
