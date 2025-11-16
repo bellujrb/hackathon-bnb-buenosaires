@@ -5,7 +5,7 @@ export * from './langgraph.module';
 export * from './services/openai-model.service';
 
 // Agents
-export * from './agents/general.agent';
+export * from './agents/pipeline.agent';
 
 // Types
 export * from './types';
