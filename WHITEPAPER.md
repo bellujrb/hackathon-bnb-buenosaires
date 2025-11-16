@@ -31,6 +31,7 @@ KPIs esperados:
 Monorepo com dois serviços:
 - `frontend-ai` (Next.js, React 19, Tailwind v4): UI de chat, upload, artefatos.
 - `backend` (NestJS, LangGraph/LangChain, SSE, Swagger): API e orquestração de LLMs.
+- `blockchain` (Solidity + Foundry): contrato `TokenDistributor` e scripts de airdrop.
 
 Comunicação: o frontend chama `POST /api/langgraph/message/stream` com histórico e, opcionalmente, endereços. O backend emite tokens por SSE até o término.
 
@@ -60,6 +61,16 @@ Nós principais (ver `backend/src/modules/langgraph/nodes/pipeline.nodes.ts`):
   - Upload e parsing de CSV/XLS/XLSX (com \`xlsx\`), detecção de delimitador, deduplicação de endereços.
   - Ações do usuário (retry/like/dislike/share/copy).
   - Artefatos custom (ex.: exibir “tabela de exemplo” quando solicitado).
+
+### 4.4 Blockchain
+- Contrato: `TokenDistributor.sol` para distribuição de tokens ERC20:
+  - `distribute(token, recipients, amountPerWallet)` para valores iguais.
+  - `distributeBatch(token, recipients, amounts)` para valores variáveis.
+- Segurança: SafeERC20, validação de entradas, eventos de log, otimizações de gas.
+- Ferramentas: Foundry (\`forge\`/\`anvil\`) para build/test/deploy; ver \`blockchain/README.md\`.
+- Uso típico:
+  - Aprovar previamente o total (ERC20 \`approve\`) ao contrato distribuidor.
+  - Executar a distribuição em lote (igual ou variável).
 
 ## 5. Fluxo de dados
 1. Usuário envia mensagem (com ou sem planilha de endereços).  

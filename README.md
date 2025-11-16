@@ -6,7 +6,8 @@ Aplicação full‑stack para análise conversacional de wallets na BNB Chain. O
 ```
 .
 ├── frontend-ai/        # App Next.js (chat, UI, upload, artefatos)
-└── backend/            # API NestJS (LangGraph, SSE, validação, prompts)
+├── backend/            # API NestJS (LangGraph, SSE, validação, prompts)
+└── blockchain/         # Contratos Solidity + Foundry (TokenDistributor, scripts)
 ```
 
 ### Principais recursos
@@ -15,6 +16,7 @@ Aplicação full‑stack para análise conversacional de wallets na BNB Chain. O
 - Pipeline LangGraph com nós: validação, elicitação de filtros, extração estruturada, execução de busca e formatação de relatório.
 - Renderização de artefatos (por ex. “tabela de exemplo”) no frontend.
 - Integrações Web3 (Privy/viem) e UI moderna (Tailwind, componentes custom).
+- Módulo blockchain com contrato `TokenDistributor` para airdrops (igual e em lote) e toolchain Foundry (build, test, deploy).
 
 ---
 
@@ -107,11 +109,28 @@ Endpoints (prefixo `/api/langgraph`):
 - `POST /analyze-wallets` e `/analyze-wallets/stream` — execução com lista explícita.
 - `GET /health` — status do agente.
 
+### Blockchain (`blockchain/`)
+- Contrato principal: `TokenDistributor.sol` (airdrop igualitário e em lote) com SafeERC20 e otimizações de gas.
+- Tooling: Foundry (`forge`, `anvil`) para build, teste, gas-report e deploy.
+- Documentos úteis: `AIRDROP_SCRIPTS.md`, `AIRDROP_TOKEN_GUIDE.md`, `QUICK_START_AIRDROP.md`, `USAGE.md`, `PROJECT_SUMMARY.md`, `CHECKLIST.md`.
+
+Comandos básicos:
+```bash
+cd blockchain
+forge install
+forge build
+forge test --gas-report
+# Local
+anvil
+forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+```
+
 ---
 
 ## Deploy (resumo)
 - Backend: containerize (Node 18+), expor porta 3000, definir `OPENAI_API_KEY`. Habilitar CORS para o domínio do frontend e usar proxy reverso (NGINX/Cloudflare) para SSE.
 - Frontend: build Next.js e hospedar (Vercel/Netlify) com `NEXT_PUBLIC_API_URL` apontando para a API pública do backend.
+ - Blockchain: usar Foundry para deploy (testnet/mainnet). Ver `blockchain/README.md` e `blockchain/AIRDROP_SCRIPTS.md`.
 
 ---
 
