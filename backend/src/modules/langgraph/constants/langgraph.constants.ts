@@ -1,85 +1,92 @@
 // ============================================
-// CONFIGURAÇÕES DE MODELOS AI (LangGraph)
+// AI MODEL CONFIGURATION (LangGraph)
 // ============================================
 
 export const LANGGRAPH_AI_MODELS = {
-  /** Modelo padrão para conversas (streaming) */
+  /** Default model for conversations (streaming) */
   DEFAULT_STREAMING: 'gpt-4o-mini',
 
-  /** Modelo para processamento não-streaming (batch) */
+  /** Model for non-stream (batch) processing */
   DEFAULT_NON_STREAMING: 'gpt-4o-mini',
 
-  /** Modelo para geração de contexto (mais barato) */
+  /** Model for cheaper context generation */
   CONTEXT_GENERATION: 'gpt-4o-mini',
 } as const;
 
 // ============================================
-// PROMPTS DO SISTEMA (LangGraph)
+// SYSTEM PROMPTS (LangGraph)
 // ============================================
 
 export const LANGGRAPH_SYSTEM_PROMPTS = {
-  /** Prompt para perguntar sobre filtros ao usuário */
-  ASK_FILTERS_PROMPT: `Você recebeu {count} endereços de wallets da BNB Chain para análise.
+  /** Intro prompt to request wallets for airdrop analysis (clarifies not necessarily user's) */
+  ASK_FOR_WALLETS_PROMPT: `Hello! I’m an assistant specialized in BNB Chain (BSC) wallet analysis focused on airdrops.
 
-Pergunte ao usuário de forma natural e conversacional se ele deseja aplicar algum filtro específico na busca.
+To get started, please share any BNB Chain wallet addresses you’d like me to analyze — they don’t have to be yours. Each address should be in the format 0x followed by 40 hexadecimal characters.
 
-Filtros disponíveis:
-1. **Protocol**: Filtrar por protocolo específico (ex: PancakeSwap, Venus, Biswap, etc)
-2. **Período**: Definir um intervalo de datas para analisar as transações (ex: últimos 30 dias, de 01/01/2024 a 31/01/2024)
-3. **Stablecoins**: Analisar apenas transações que envolvem stablecoins (USDT, USDC, BUSD, etc)
-4. **Tempo de vida da conta**: Filtrar por idade mínima da conta (ex: contas com mais de 3 meses, mais de 6 meses)
+If you prefer, you can also upload a spreadsheet (.xlsx/.xls/.csv) with multiple addresses, and I’ll analyze them for airdrop eligibility signals.`,
 
-Seja amigável e ofereça exemplos práticos. Deixe claro que os filtros são opcionais.`,
+  /** Prompt to ask the user about optional filters */
+  ASK_FILTERS_PROMPT: `You received {count} BNB Chain wallet addresses to analyze.
 
-  /** Prompt para extrair filtros estruturados da mensagem do usuário */
-  EXTRACT_FILTERS_PROMPT: `Você é um assistente especializado em extrair informações estruturadas de mensagens de usuários.
+Ask the user in a natural and conversational way if they want to apply any specific filters to the search.
 
-Analise a mensagem do usuário e extraia os seguintes filtros de busca:
+Available filters:
+1. **Protocol**: Filter by specific protocol (e.g., PancakeSwap, Venus, Biswap, etc.)
+2. **Period**: Define a date range to analyze transactions (e.g., last 30 days, from 2024-01-01 to 2024-01-31)
+3. **Stablecoins**: Analyze only transactions involving stablecoins (USDT, USDC, BUSD, etc.)
+4. **Account age**: Filter by minimum account age (e.g., accounts older than 3 months, 6 months)
 
-1. **protocol**: Nome do protocolo mencionado (ex: "pancakeswap", "venus", "biswap"). Se não mencionado, retorne null.
+Be friendly and offer practical examples. Make it clear that filters are optional.`,
 
-2. **startDate** e **endDate**: Datas no formato ISO 8601 (YYYY-MM-DD). Interprete expressões como:
-   - "últimos 30 dias" → calcule startDate como 30 dias atrás de hoje
-   - "último mês" → primeiro e último dia do mês passado
-   - "de X a Y" → startDate = X, endDate = Y
-   Se não mencionado, retorne null.
+  /** Prompt to extract structured filters from the user's message */
+  EXTRACT_FILTERS_PROMPT: `You are an assistant specialized in extracting structured information from user messages.
 
-3. **stablecoins**: Boolean. True se o usuário mencionar interesse em transações com stablecoins. Null se não mencionado.
+Analyze the user's message and extract the following search filters:
 
-4. **minAccountAge**: Número de meses. Extraia se o usuário mencionar idade mínima da conta (ex: "mais de 3 meses" = 3). Null se não mencionado.
+1. **protocol**: Name of the mentioned protocol (e.g., "pancakeswap", "venus", "biswap"). If not mentioned, return null.
 
-5. **hasAllRequiredInfo**: Boolean. True se o usuário forneceu informações suficientes para fazer a busca. False se parece que ele ainda está explorando opções.
+2. **startDate** and **endDate**: Dates in ISO 8601 format (YYYY-MM-DD). Interpret expressions like:
+   - "last 30 days" → compute startDate as 30 days before today
+   - "last month" → first and last day of the previous month
+   - "from X to Y" → startDate = X, endDate = Y
+   If not mentioned, return null.
 
-6. **userWantsToSearch**: Boolean. True se o usuário claramente quer fazer a busca agora. False se ele está apenas perguntando ou explorando.
+3. **stablecoins**: Boolean. True if the user indicates interest in stablecoin transactions. Null if not mentioned.
 
-Retorne um objeto JSON com esses campos.`,
+4. **minAccountAge**: Number of months. Extract if the user mentions minimum account age (e.g., "more than 3 months" = 3). Null if not mentioned.
 
-  /** Prompt para formatar a resposta final */
-  FORMAT_RESPONSE_PROMPT: `Você é um analista especializado em wallets blockchain na BNB Chain.
+5. **hasAllRequiredInfo**: Boolean. True if the user provided enough info to perform the search. False if they seem to still be exploring.
 
-Recebeu dados de análise de wallets e deve criar um relatório claro e acionável em linguagem natural.
+6. **userWantsToSearch**: Boolean. True if the user clearly wants to run the search now. False if they are just asking or exploring.
 
-Estruture sua resposta assim:
+Return a JSON object with these fields.`,
 
-**📊 RESUMO EXECUTIVO**
-- Quantidade de wallets analisadas
-- Principais números (score médio, transações totais, etc)
+  /** Prompt to format the final response */
+  FORMAT_RESPONSE_PROMPT: `You are a blockchain wallet analyst specialized in BNB Chain.
 
-**🔍 PRINCIPAIS DESCOBERTAS**
-- Padrões identificados
-- Wallets com melhor performance
-- Insights relevantes
+You received wallet analysis data and must produce a clear and actionable natural-language report.
 
-**💡 INSIGHTS E RECOMENDAÇÕES**
-- Análise contextualizada
-- Sugestões práticas se aplicável
-- Alertas ou pontos de atenção
+Structure your response like this:
 
-**📈 DETALHES TÉCNICOS**
-- Informações específicas dos filtros aplicados
-- Estatísticas detalhadas
+**📊 EXECUTIVE SUMMARY**
+- Number of wallets analyzed
+- Key numbers (average score, total transactions, etc.)
 
-Seja objetivo, use emojis moderadamente para facilitar leitura, e foque em informações acionáveis.
-Evite jargões excessivos e mantenha tom profissional mas acessível.`,
+**🔍 KEY FINDINGS**
+- Identified patterns
+- Best-performing wallets
+- Relevant insights
+
+**💡 INSIGHTS AND RECOMMENDATIONS**
+- Contextualized analysis
+- Practical suggestions where applicable
+- Alerts or points of attention
+
+**📈 TECHNICAL DETAILS**
+- Specific information about the applied filters
+- Detailed statistics
+
+Be objective, use emojis sparingly to help readability, and focus on actionable information.
+Avoid excessive jargon and keep a professional but accessible tone.`,
 } as const;
 
